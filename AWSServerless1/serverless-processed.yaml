@@ -46,7 +46,7 @@ Resources:
     Type: 'AWS::Lambda::Function'
     Properties:
       Code:
-        S3Bucket: cf-templates-xfgyhgphw5hc-us-east-1
+        S3Bucket: bucket-name
         S3Key: serverless1.zip
       Tags:
         - Value: SAM
