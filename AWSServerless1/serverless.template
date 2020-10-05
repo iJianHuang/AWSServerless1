@@ -8,10 +8,10 @@
       "Properties": {
         "Handler": "AWSServerless1::AWSServerless1.LambdaEntryPoint::FunctionHandlerAsync",
         "Runtime": "dotnetcore2.1",
-        "CodeUri": "bin\\Release\\netcoreapp2.1\\publish",
+        "CodeUri": "s3-buckname/package.zip",
         "MemorySize": 256,
         "Timeout": 30,
-        "Role": "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole,arn:aws:iam::aws:policy/AWSLambdaFullAccess",
+        "Role": "null",
         "Policies": [
           "AWSLambdaFullAccess"
         ],
