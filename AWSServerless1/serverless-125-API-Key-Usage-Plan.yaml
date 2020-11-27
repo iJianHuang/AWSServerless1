@@ -28,11 +28,44 @@ Resources:
     Properties:
       StageName: !Sub ${Stage}  
       Auth:
-        ApiKeyRequired: 'true'
-        UsagePlan:
-          CreateUsagePlan: PER_API
-          UsagePlanName: !Join [" ", [{"Ref": "AWS::StackName"}, "usage plan"]]
-     
+           ApiKeyRequired: 'true'  
+ 
+  MyUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    DependsOn:
+      - MyServerlessRestApi
+    Properties:
+      ApiStages:
+        - ApiId: !Ref MyServerlessRestApi
+          Stage: !Ref MyServerlessRestApi.Stage 
+      Description: Customer ABC usage plan
+      Quota:
+        Limit: 5000
+        Period: MONTH
+      Throttle:
+        BurstLimit: 200
+        RateLimit: 100
+      UsagePlanName: !Sub Plan_MyServerlessRestApi_${Stage}
+    
+  MyApiKey:
+    Type: 'AWS::ApiGateway::ApiKey'
+    DependsOn:
+      - MyUsagePlan  
+    Properties:
+      Name: TestApiKey
+      Description: CloudFormation API Key V1
+      Enabled: 'true'
+      StageKeys:
+        - RestApiId: !Ref MyServerlessRestApi
+          StageName: !Sub ${Stage}
+  
+  MyUsagePlanKey:
+    Type: 'AWS::ApiGateway::UsagePlanKey'
+    Properties:
+      KeyId: !Ref MyApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref MyUsagePlan
+  
   AspNetCoreFunctionRole:
     Type: 'AWS::IAM::Role'
     Properties:

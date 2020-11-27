@@ -1,0 +1,175 @@
+AWSTemplateFormatVersion: 2010-09-09
+Outputs:
+  ApiURL:
+    Description: API endpoint URL for the environment
+    Value: !Sub >-
+      https://${MyServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/
+Resources:
+  MyServerlessRestApiStage:
+    Type: 'AWS::ApiGateway::Stage'
+    Properties:
+      DeploymentId: !Ref MyServerlessRestApiDeployment0731dc435d
+      RestApiId: !Ref MyServerlessRestApi
+      StageName: !Sub '${Stage}'
+  MyServerlessRestApiDeployment0731dc435d:
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref MyServerlessRestApi
+      Description: 'RestApi deployment id: 0731dc435daceca623989ca6f4a492ec3fe40342'
+  AspNetCoreFunctionProxyResourcePermissionStage:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      FunctionName: !Ref AspNetCoreFunction
+      SourceArn: !Sub 
+        - >-
+          arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/*/*
+        - __Stage__: '*'
+          __ApiId__: !Ref MyServerlessRestApi
+  MyUsagePlanKey:
+    Type: 'AWS::ApiGateway::UsagePlanKey'
+    Properties:
+      KeyType: API_KEY
+      KeyId: !Ref MyApiKey
+      UsagePlanId: !Ref MyUsagePlan
+  AspNetCoreFunctionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Policies:
+        - PolicyName: !Sub 'AspNetCoreFunctionRole-InlinePolicy-Log-${Stage}'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action: 'logs:CreateLogGroup'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+                Effect: Allow
+              - Action:
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub >-
+                  arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-AspNetCoreFunction-*:*:*
+                Effect: Allow
+        - PolicyName: !Sub 'AspNetCoreFunctionRole-InlinePolicy-DynamoDb-${Stage}'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Action:
+                  - 'dynamodb:Query'
+                  - 'dynamodb:Scan'
+                  - 'dynamodb:GetItem'
+                Resource: !Sub >-
+                  arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/YourDbTable-${Stage}
+                Effect: Allow
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+  MyUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    Properties:
+      ApiStages:
+        - ApiId: !Ref MyServerlessRestApi
+          Stage: !Ref MyServerlessRestApiStage
+      Throttle:
+        RateLimit: 100
+        BurstLimit: 200
+      UsagePlanName: !Sub 'Plan_MyServerlessRestApi_${Stage}'
+      Description: Customer ABC usage plan
+      Quota:
+        Limit: 5000
+        Period: MONTH
+    DependsOn:
+      - MyServerlessRestApi
+  AspNetCoreFunctionRootResourcePermissionStage:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      Principal: apigateway.amazonaws.com
+      FunctionName: !Ref AspNetCoreFunction
+      SourceArn: !Sub 
+        - >-
+          arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${__ApiId__}/${__Stage__}/*/
+        - __Stage__: '*'
+          __ApiId__: !Ref MyServerlessRestApi
+  AspNetCoreFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Code:
+        S3Bucket: cf-templates-xfgyhgphw5hc-us-east-1
+        S3Key: serverless1.zip
+      Tags:
+        - Value: SAM
+          Key: 'lambda:createdBy'
+        - Value: !Sub '${Stage}'
+          Key: environment-type
+      MemorySize: 256
+      Environment:
+        Variables:
+          STAGE: !Sub '${Stage}'
+      Handler: 'AWSServerless1::AWSServerless1.LambdaEntryPoint::FunctionHandlerAsync'
+      Role: !GetAtt AspNetCoreFunctionRole.Arn
+      Timeout: 30
+      Runtime: dotnetcore2.1
+  MyServerlessRestApi:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Body:
+        info:
+          version: '1.0'
+          title: !Ref 'AWS::StackName'
+        paths:
+          '/{proxy+}':
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub >-
+                  arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AspNetCoreFunction.Arn}/invocations
+              security:
+                - api_key: []
+              responses: {}
+          /:
+            x-amazon-apigateway-any-method:
+              x-amazon-apigateway-integration:
+                httpMethod: POST
+                type: aws_proxy
+                uri: !Sub >-
+                  arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AspNetCoreFunction.Arn}/invocations
+              security:
+                - api_key: []
+              responses: {}
+        openapi: 3.0.1
+        components:
+          securitySchemes:
+            api_key:
+              type: apiKey
+              name: x-api-key
+              in: header
+  MyApiKey:
+    Type: 'AWS::ApiGateway::ApiKey'
+    Properties:
+      StageKeys:
+        - RestApiId: !Ref MyServerlessRestApi
+          StageName: !Sub '${Stage}'
+      Enabled: 'true'
+      Description: CloudFormation API Key V1
+      Name: TestApiKey
+    DependsOn:
+      - MyUsagePlan
+Description: >-
+  An AWS Serverless Application that uses the ASP.NET Core framework running in
+  Amazon Lambda.
+Parameters:
+  Stage:
+    Default: dev
+    Type: String
+    Description: API stage
+    AllowedValues:
+      - dev
+      - prod
