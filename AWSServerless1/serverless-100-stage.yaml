@@ -41,5 +41,5 @@ Resources:
             RestApiId: !Ref MyServerlessRestApi
 Outputs:
   ApiURL:
-    Description: !Sub 'API endpoint URL for ${Stage} environment'
+    Description: API endpoint URL for the environment
     Value: !Sub 'https://${MyServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/'

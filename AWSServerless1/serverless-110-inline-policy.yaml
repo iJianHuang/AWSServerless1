@@ -1,0 +1,93 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: 'AWS::Serverless-2016-10-31'
+Description: >-
+  An AWS Serverless Application that uses the ASP.NET Core framework running in
+  Amazon Lambda.
+Globals:
+  Api:
+    OpenApiVersion: 3.0.1
+  Function:
+    Tags:
+      environment-type: !Sub ${Stage}
+    Environment:
+      Variables:
+        STAGE: !Sub ${Stage}      
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev  
+    Description: API stage
+    AllowedValues: 
+      - dev
+      - prod
+
+Resources:
+  MyServerlessRestApi:
+    Type: 'AWS::Serverless::Api'
+    Properties:
+      StageName: !Sub ${Stage}  
+  
+  AspNetCoreFunctionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: !Sub 'AspNetCoreFunctionRole-InlinePolicy-Log-${Stage}' 
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 'logs:CreateLogGroup'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:*'
+              - Effect: Allow
+                Action: 
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-AspNetCoreFunction-*:*:*'
+        - PolicyName: !Sub 'AspNetCoreFunctionRole-InlinePolicy-DynamoDb-${Stage}'
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: 
+                  - 'dynamodb:Query'
+                  - 'dynamodb:Scan'
+                  - 'dynamodb:GetItem'
+                Resource: !Sub 'arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/YourDbTable-${Stage}'
+  
+  AspNetCoreFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: 'AWSServerless1::AWSServerless1.LambdaEntryPoint::FunctionHandlerAsync'
+      Runtime: dotnetcore2.1
+      CodeUri: 's3://cf-templates-xfgyhgphw5hc-us-east-1/serverless1.zip'
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt AspNetCoreFunctionRole.Arn
+      Events:
+        ProxyResource:
+          Type: Api
+          Properties:
+            Path: '/{proxy+}'
+            Method: ANY
+            RestApiId: !Ref MyServerlessRestApi  
+        RootResource:
+          Type: Api
+          Properties:
+            Path: /
+            Method: ANY
+            RestApiId: !Ref MyServerlessRestApi
+
+Outputs:
+  ApiURL:
+    Description: API endpoint URL for the environment
+    Value: !Sub 'https://${MyServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/'
