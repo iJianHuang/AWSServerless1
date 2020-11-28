@@ -11,7 +11,7 @@ Globals:
       environment-type: !Sub ${Stage}
     Environment:
       Variables:
-        STAGE: !Sub ${Stage}      
+        STAGE: !Sub ${Stage}              
 
 Parameters:
   Stage:
@@ -32,8 +32,6 @@ Resources:
  
   MyUsagePlan:
     Type: 'AWS::ApiGateway::UsagePlan'
-    DependsOn:
-      - MyServerlessRestApi
     Properties:
       ApiStages:
         - ApiId: !Ref MyServerlessRestApi
@@ -45,14 +43,14 @@ Resources:
       Throttle:
         BurstLimit: 200
         RateLimit: 100
-      UsagePlanName: !Sub Plan_MyServerlessRestApi_${Stage}
+      UsagePlanName: !Sub MyServerlessRestApi_${Stage}_Usage_Plan
     
   MyApiKey:
     Type: 'AWS::ApiGateway::ApiKey'
     DependsOn:
       - MyUsagePlan  
     Properties:
-      Name: TestApiKey
+      Name: !Sub MyApiKey_${Stage}
       Description: CloudFormation API Key V1
       Enabled: 'true'
       StageKeys:
